@@ -231,7 +231,33 @@ def plot_pam(args, ax, D1, F1, Jxyz, B1, L1, which_j, cax):
         vmax=Jxyz[which_j].max() if args.normalization == 'per_direction' else Jxyz.max()
     )
     s_m = mpl.cm.ScalarMappable(cmap=["PiYG", 'PuOr', "seismic"][which_j], norm=norm)
+    s_m.set_array([Jxyz[which_j]])
 
+    # Always plot the gray lines for each band, regardless of plot type
+    for jj in range(F1.shape[1]):
+        ik = 0
+        for nseg in B1:
+            x, y = D1[ik:ik+nseg], F1[ik:ik+nseg, jj]
+            z = Jxyz[which_j, ik:ik+nseg, jj]
+            
+            # Plot the gray line for this segment
+            line_width = 2.0 if args.plt_type == 'colormap' else 0.5
+            ax.plot(x, y, lw=line_width, color='gray')
+            
+            # If using colormap, add the colored line collection
+            if args.plt_type == 'colormap':
+                points = np.array([x, y]).T.reshape(-1, 1, 2)
+                segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                lc = LineCollection(segments,
+                                    colors=[s_m.to_rgba(ww)
+                                            for ww in (z[1:] + z[:-1])/2.])
+                lc.set_linewidth(2.0)
+                lc.set_alpha(0.8)
+                ax.add_collection(lc)
+                
+            ik += nseg
+
+    # Add scatter points if using scatter plot type
     if args.plt_type == 'scatter':
         ax.scatter(
             np.tile(D1, (F1.shape[1], 1)).T,
@@ -241,14 +267,8 @@ def plot_pam(args, ax, D1, F1, Jxyz, B1, L1, which_j, cax):
             cmap=s_m.cmap,
             norm=norm
         )
-    else:  # 'colormap'
-        for jj in range(F1.shape[1]):
-            ik = 0
-            for nseg in B1:
-                x, y = D1[ik:ik+nseg], F1[ik:ik+nseg, jj]
-                ax.plot(x, y, lw=2.0, color='gray')
-                ik += nseg
 
+    # Add vertical lines at segment boundaries
     for jj in np.cumsum(B1)[:-1]:
         ax.axvline(x=D1[jj], ls='--', color='gray', alpha=0.8, lw=0.5)
 
@@ -415,7 +435,7 @@ def parse_cml_args(cml):
     parser.add_argument('-s', '--figsize', nargs=2, type=float, help='Figure size (width height)')
     parser.add_argument('-o', dest='figname', default='pam.png', help='Output figure filename')
     parser.add_argument('--plt-type', choices=['scatter', 'colormap'], default='scatter', help='Plot type')
-    parser.add_argument('--layout', choices=['h', 'v'], default='v', help='Layout of subfigures')
+    parser.add_argument('--layout', choices=['h', 'v'], default='h', help='Layout of subfigures')
     parser.add_argument('-od', '--output_data', dest='output_file', default='', help='Output data file')
     parser.add_argument('-n', '--normalization', choices=['per_direction', 'all'], default='per_direction', help='Normalization method')
     parser.add_argument('-idx', '--index', dest='idx',  type=int, default=0, help='Band number to plot')
